@@ -1,0 +1,13 @@
+[
+  { "value": "text",          "label": "Text",                       "field_type": "text"       },
+  { "value": "multiline",     "label": "Multiline Text",             "field_type": "textarea"   },
+  { "value": "richtext",      "label": "Rich Text",                  "field_type": "richtext"   },
+  { "value": "number",        "label": "Number",                     "field_type": "integer"    },
+  { "value": "date",          "label": "Date",                       "field_type": "date"       },
+  { "value": "datetime",      "label": "Date & Time",                "field_type": "datetime"   },
+  { "value": "time",          "label": "Time",                       "field_type": "time"       },
+  { "value": "select_single", "label": "Select (Single)",            "field_type": "select"     },
+  { "value": "select_multi",  "label": "Select (Multiple, CSV)",     "field_type": "multiselect"},
+  { "value": "list",          "label": "List",                       "field_type": "textarea"   },
+  { "value": "toggle",        "label": "Toggle",                     "field_type": "toggle"     }
+]

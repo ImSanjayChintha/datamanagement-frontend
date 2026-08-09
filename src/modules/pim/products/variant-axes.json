@@ -1,0 +1,45 @@
+{
+  "axes": [
+    {
+      "code": "packaging",
+      "color": "blue",
+      "label": { "en": "Packaging", "fr": "Emballage", "de": "Verpackung", "es": "Embalaje", "it": "Imballaggio" },
+      "values": [
+        { "code": "single_box", "label": { "en": "Single Box",  "fr": "Boîte individuelle", "de": "Einzelbox",        "es": "Caja individual",  "it": "Scatola singola" } },
+        { "code": "industrial", "label": { "en": "Industrial",  "fr": "Industriel",         "de": "Industriell",      "es": "Industrial",       "it": "Industriale" } },
+        { "code": "bulk",       "label": { "en": "Bulk",        "fr": "Vrac",               "de": "Massengut",        "es": "Granel",           "it": "Sfuso" } },
+        { "code": "blister",   "label": { "en": "Blister",      "fr": "Blister",            "de": "Blisterpackung",   "es": "Blíster",          "it": "Blister" } }
+      ]
+    },
+    {
+      "code": "quality",
+      "color": "amber",
+      "label": { "en": "Quality", "fr": "Qualité", "de": "Qualität", "es": "Calidad", "it": "Qualità" },
+      "values": [
+        { "code": "premium",  "label": { "en": "Premium",  "fr": "Premium",    "de": "Premium",        "es": "Premium",    "it": "Premium" } },
+        { "code": "standard", "label": { "en": "Standard", "fr": "Standard",   "de": "Standard",       "es": "Estándar",   "it": "Standard" } },
+        { "code": "economy",  "label": { "en": "Economy",  "fr": "Économique", "de": "Wirtschaftlich", "es": "Económico",  "it": "Economico" } }
+      ]
+    },
+    {
+      "code": "origin",
+      "color": "emerald",
+      "label": { "en": "Origin", "fr": "Origine", "de": "Herkunft", "es": "Origen", "it": "Origine" },
+      "values": [
+        { "code": "eu", "label": { "en": "European Union", "fr": "Union Européenne", "de": "Europäische Union", "es": "Unión Europea", "it": "Unione Europea" } },
+        { "code": "jp", "label": { "en": "Japan",           "fr": "Japon",           "de": "Japan",             "es": "Japón",         "it": "Giappone" } },
+        { "code": "cn", "label": { "en": "China",           "fr": "Chine",           "de": "China",             "es": "China",         "it": "Cina" } },
+        { "code": "in", "label": { "en": "India",           "fr": "Inde",            "de": "Indien",            "es": "India",         "it": "India" } }
+      ]
+    },
+    {
+      "code": "generation",
+      "color": "violet",
+      "label": { "en": "Generation", "fr": "Génération", "de": "Generation", "es": "Generación", "it": "Generazione" },
+      "values": [
+        { "code": "v1", "label": { "en": "Gen 1", "fr": "Gén. 1", "de": "Gen. 1", "es": "Gen. 1", "it": "Gen. 1" } },
+        { "code": "v2", "label": { "en": "Gen 2", "fr": "Gén. 2", "de": "Gen. 2", "es": "Gen. 2", "it": "Gen. 2" } }
+      ]
+    }
+  ]
+}

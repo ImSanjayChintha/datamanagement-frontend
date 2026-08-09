@@ -1,0 +1,13 @@
+[
+  { "code": "text",        "label": "Text" },
+  { "code": "textarea",    "label": "Text Area" },
+  { "code": "richtext",    "label": "Rich Text" },
+  { "code": "number",      "label": "Number" },
+  { "code": "integer",     "label": "Integer" },
+  { "code": "decimal",     "label": "Decimal" },
+  { "code": "boolean",     "label": "Yes / No" },
+  { "code": "date",        "label": "Date" },
+  { "code": "url",         "label": "URL" },
+  { "code": "select",      "label": "Select — single value" },
+  { "code": "multiselect", "label": "Select — multiple values" }
+]
