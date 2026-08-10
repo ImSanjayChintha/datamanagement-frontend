@@ -5,6 +5,7 @@ import {
   Plus, ChevronRight, Loader2, Pencil, Trash2,
   Package, X, Users, FolderTree,
   Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -339,6 +340,26 @@ export default function ProductsListPage() {
     onError: (e: Error) => toast.error(e.message || 'Download failed'),
   });
 
+  const exportDataMut = useMutation({
+    mutationFn: () => {
+      if (!selectedFamily) throw new Error('Select a family first');
+      return toolkitExportApi.data({
+        family_code: selectedFamily,
+        endpoint: '/gateway/products/export-data',
+      });
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `products-${selectedFamily}-export.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Export downloaded');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Export failed'),
+  });
+
 
   // ── Delete ──
 
@@ -579,10 +600,34 @@ export default function ProductsListPage() {
           </label>
 
           <button
+            onClick={() => exportDataMut.mutate()}
+            disabled={exportDataMut.isPending}
+            title="Export all products for the selected family to Excel"
+            aria-label="Export all products for the selected family to Excel"
+            className="inline-flex items-center justify-center p-2 rounded-lg
+             border border-gray-200 dark:border-gray-700
+             text-gray-600 dark:text-gray-300
+             hover:bg-gray-50 dark:hover:bg-gray-800
+             transition-colors shadow-sm shrink-0
+             disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+           {exportDataMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+          </button>
+
+          <button
             onClick={() => exportMut.mutate()}
             disabled={exportMut.isPending}
-            title={selectedFamily ? 'Download Template' : 'Select a family first'}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold
+            title={
+              selectedFamily
+                ? 'Download empty Excel template for the selected family'
+                : 'Select a family first'
+            }
+            aria-label={
+              selectedFamily
+                ? 'Download empty Excel template for the selected family'
+                : 'Select a family first'
+            }
+            className="inline-flex items-center justify-center p-2 rounded-lg
              border border-gray-200 dark:border-gray-700
              text-gray-600 dark:text-gray-300
              hover:bg-gray-50 dark:hover:bg-gray-800
@@ -590,7 +635,6 @@ export default function ProductsListPage() {
              disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {exportMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Download Template
           </button>
 
           <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />

@@ -105,6 +105,13 @@ schemaContext: (codes?: string[]) =>
     ),
 };
 
+export const toolkitExportApi = {
+  template: (body: { family_code: string; endpoint: string }) =>
+    postBlob('/admin/toolkit/export/template', body),
+  data: (body: { family_code: string; endpoint: string }) =>
+    postBlob('/admin/toolkit/export/data', body),
+};
+
 // ── Fields ────────────────────────────────────────────────────────────────────
 
 export const toolkitFieldsApi = {
@@ -168,6 +175,8 @@ export const toolkitTranslationsApi = {
     post<LangOption[]>('/admin/toolkit/translations/available-languages'),
 };
 
+
+
 // ── Data (generic CRUD) ───────────────────────────────────────────────────────
 
 export const toolkitDataApi = {
@@ -212,10 +221,6 @@ export interface SqlExecResult {
   saved_object?: ToolkitSavedObject | null;
 }
 
-export const toolkitExportApi = {
-  template: (body: { family_code: string; endpoint: string }) =>
-    postBlob('/admin/toolkit/export/template', body),
-};
 
 export const toolkitSqlApi = {
   validate: (sql: string) =>
