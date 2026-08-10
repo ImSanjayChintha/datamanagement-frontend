@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, ChevronRight, Loader2, Pencil, Trash2,
   Package, X, Users, FolderTree,
+  Download,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -16,7 +17,7 @@ import { pageDefsApi } from '@/modules/page-manager/page-defs/api';
 import { makeEntityApi, pimCategoriesApi } from '@/modules/pim/api';
 import { catLabel } from './CategoryPicker';
 import type { ToolkitField, ToolkitFieldOption } from '@/types/toolkit';
-
+import { toolkitExportApi } from '@/modules/toolkit/core/api';
 // ── API instances ─────────────────────────────────────────────────────────────
 
 const productsApi = makeEntityApi('products', 'products');
@@ -27,15 +28,15 @@ const familiesApi = makeEntityApi('families', 'families');
 type Row = Record<string, unknown>;
 
 interface TreeNode {
-  id:             number;
-  code:           string;
-  name:           string;
-  raw:            Row;
-  isExpanded:     boolean;
-  isLoading:      boolean;
-  hasChildren:    boolean;
+  id: number;
+  code: string;
+  name: string;
+  raw: Row;
+  isExpanded: boolean;
+  isLoading: boolean;
+  hasChildren: boolean;
   childrenLoaded: boolean;
-  children:       TreeNode[];
+  children: TreeNode[];
 }
 
 type FlatNode = TreeNode & { depth: number };
@@ -48,7 +49,7 @@ function resolveName(row: Row): string {
     if (!v) continue;
     if (typeof v === 'string') return v;
     if (typeof v === 'object' && v !== null) {
-      const o  = v as Record<string, unknown>;
+      const o = v as Record<string, unknown>;
       const en = o.en ?? o.EN;
       if (en) return String(en);
       const first = Object.values(o).find(x => x);
@@ -89,7 +90,7 @@ async function fetchCategoryLevel(parentCode: string | null): Promise<TreeNode[]
   if (res.rows.length === 0) return [];
   const nodes = res.rows.map(r => toTreeNode(r, false));
   try {
-    const codes      = nodes.map(n => n.code);
+    const codes = nodes.map(n => n.code);
     const childCheck = await pimCategoriesApi.list({
       filters: { parent_code: { op: 'in', value: codes } }, limit: 500,
     });
@@ -106,9 +107,9 @@ function CategoryTree({
   selectedCode, onSelect,
 }: {
   selectedCode: string | null;
-  onSelect:     (code: string | null, name: string) => void;
+  onSelect: (code: string | null, name: string) => void;
 }) {
-  const [roots,       setRoots]       = useState<TreeNode[]>([]);
+  const [roots, setRoots] = useState<TreeNode[]>([]);
   const [loadingRoot, setLoadingRoot] = useState(true);
 
   useEffect(() => {
@@ -192,23 +193,23 @@ const ENTITY = 'products';
 
 export default function ProductsListPage() {
   const navigate = useNavigate();
-  const qc       = useQueryClient();
+  const qc = useQueryClient();
 
   // ── Left panel state ──
 
-  const [filterType,     setFilterType]     = useState<'all' | 'family' | 'category'>('family');
+  const [filterType, setFilterType] = useState<'all' | 'family' | 'category'>('family');
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
-  const [selectedCat,    setSelectedCat]    = useState<string | null>(null);
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [selectedCatLbl, setSelectedCatLbl] = useState('');
 
   // ── Table state ──
 
-  const [page,         setPage]         = useState(1);
-  const [pageSize,     setPageSize]     = useState(100);
-  const [colFilters,   setColFilters]   = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const [showInactive, setShowInactive] = useState(false);
-  const [visibleCols,  setVisibleCols]  = useState<string[]>([]);
-  const [deleting,     setDeleting]     = useState<string | number | null>(null);
+  const [visibleCols, setVisibleCols] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState<string | number | null>(null);
   const colsInitialized = useRef(false);
 
   useEffect(() => { setPage(1); }, [filterType, selectedFamily, selectedCat, colFilters, showInactive]);
@@ -216,25 +217,25 @@ export default function ProductsListPage() {
   // ── Page definition — drives columns ──
 
   const { data: pageDef, isLoading: loadingDef } = useQuery({
-    queryKey:  QK.pageDef(ENTITY),
-    queryFn:   () => pageDefsApi.get(ENTITY),
+    queryKey: QK.pageDef(ENTITY),
+    queryFn: () => pageDefsApi.get(ENTITY),
     staleTime: 5 * 60_000,
-    retry:     false,
+    retry: false,
   });
 
   const { data: tableDef } = useQuery({
-    queryKey:  ['toolkit-table', ENTITY],
-    queryFn:   productsApi.meta,
+    queryKey: ['toolkit-table', ENTITY],
+    queryFn: productsApi.meta,
     staleTime: 5 * 60_000,
-    retry:     false,
-    enabled:   !!pageDef,
+    retry: false,
+    enabled: !!pageDef,
   });
 
   // ── Families for left panel ──
 
   const { data: familyRes } = useQuery({
     queryKey: ['pim-families-all'],
-    queryFn:  () => familiesApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
+    queryFn: () => familiesApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
     staleTime: 5 * 60_000,
   });
   const families = useMemo(() => (familyRes?.rows ?? []) as Row[], [familyRes]);
@@ -273,8 +274,8 @@ export default function ProductsListPage() {
       ...staticFilters,
       ...(!showInactive ? { is_active: true } : {}),
     };
-    if (filterType === 'family'   && selectedFamily) flat.family_code   = selectedFamily;
-    if (filterType === 'category' && selectedCat)    flat.categories_code = { op: 'any', value: selectedCat };
+    if (filterType === 'family' && selectedFamily) flat.family_code = selectedFamily;
+    if (filterType === 'category' && selectedCat) flat.categories_code = { op: 'any', value: selectedCat };
     for (const [k, v] of Object.entries(colFilters)) {
       if (!v) continue;
       const op = filterOpMap.get(k) ?? 'eq';
@@ -302,18 +303,42 @@ export default function ProductsListPage() {
   // ── Products query ──
 
   const { data: result, isLoading, isFetching, isPlaceholderData } = useQuery({
-    queryKey:        ['pim-products', serverFilters, page, pageSize],
-    queryFn:         () => productsApi.list({ filters: serverFilters, sort: sortFields.length ? sortFields : undefined, limit: pageSize, offset: (page - 1) * pageSize }),
-    enabled:         !!pageDef,
+    queryKey: ['pim-products', serverFilters, page, pageSize],
+    queryFn: () => productsApi.list({ filters: serverFilters, sort: sortFields.length ? sortFields : undefined, limit: pageSize, offset: (page - 1) * pageSize }),
+    enabled: !!pageDef,
     placeholderData: prev => prev,
-    staleTime:       0,
+    staleTime: 0,
   });
 
   // When showing placeholder (stale data from previous filter), clear rows so
   // AdminTable renders a spinner instead of the previous category's data.
-  const rows  = (isPlaceholderData ? [] : result?.rows  ?? []) as Row[];
-  const total = isPlaceholderData ? 0 : result?.total  ?? 0;
+  const rows = (isPlaceholderData ? [] : result?.rows ?? []) as Row[];
+  const total = isPlaceholderData ? 0 : result?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
+
+  // ── Export Template ──
+  const exportMut = useMutation({
+    mutationFn: () => {
+      const endpoint = (pageDef?.export_endpoint ?? '').trim();
+      if (!selectedFamily) throw new Error('Select a family first');
+      if (!endpoint) throw new Error('Export endpoint is not configured for this page');
+      return toolkitExportApi.template({
+        family_code: selectedFamily,
+        endpoint,
+      });
+    },
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `products-${selectedFamily}-template.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Template downloaded');
+    },
+    onError: (e: Error) => toast.error(e.message || 'Download failed'),
+  });
+
 
   // ── Delete ──
 
@@ -336,14 +361,14 @@ export default function ProductsListPage() {
       ((tableDef as { fields?: ToolkitField[] } | undefined)?.fields ?? []).map((f: ToolkitField) => [f.code, f]),
     );
     return defCols.map((c: { code: string; bindkey?: string }) => {
-      const f       = fieldMap.get(c.code);
+      const f = fieldMap.get(c.code);
       const dataKey = c.bindkey || c.code;
-      const header  = (f as ToolkitField | undefined)?.label
+      const header = (f as ToolkitField | undefined)?.label
         ?? c.code.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
       return {
-        key:    c.code,
+        key: c.code,
         header,
-        width:  150,
+        width: 150,
         render: (row: Row) => {
           const v = row[dataKey];
           if (v == null) return <span className="text-gray-400 dark:text-gray-500">—</span>;
@@ -410,8 +435,8 @@ export default function ProductsListPage() {
   // ── Active filter label for header ──
 
   const activeFilterLabel = useMemo(() => {
-    if (filterType === 'family'   && selectedFamily) return catLabel(families.find(f => f.code === selectedFamily)?.name) || selectedFamily;
-    if (filterType === 'category' && selectedCat)    return selectedCatLbl || selectedCat;
+    if (filterType === 'family' && selectedFamily) return catLabel(families.find(f => f.code === selectedFamily)?.name) || selectedFamily;
+    if (filterType === 'category' && selectedCat) return selectedCatLbl || selectedCat;
     return null;
   }, [filterType, selectedFamily, selectedCat, selectedCatLbl, families]);
 
@@ -480,7 +505,7 @@ export default function ProductsListPage() {
               {families.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-gray-400 italic">No families found</p>
               ) : families.map(f => {
-                const fcode  = f.code as string;
+                const fcode = f.code as string;
                 const active = filterType === 'family' && selectedFamily === fcode;
                 return (
                   <button
@@ -553,6 +578,21 @@ export default function ProductsListPage() {
             <span className="text-xs text-gray-500 dark:text-gray-400">Show inactive</span>
           </label>
 
+          <button
+            onClick={() => exportMut.mutate()}
+            disabled={exportMut.isPending}
+            title={selectedFamily ? 'Download Template' : 'Select a family first'}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold
+             border border-gray-200 dark:border-gray-700
+             text-gray-600 dark:text-gray-300
+             hover:bg-gray-50 dark:hover:bg-gray-800
+             transition-colors shadow-sm shrink-0
+             disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Download Template
+          </button>
+
           <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0" />
 
           <button
@@ -596,8 +636,8 @@ export default function ProductsListPage() {
             onRowClick={row => navigate(`/pim/products/${row.id}/edit`)}
             emptyMessage="No products found"
             columnSelector={{
-              all:      allDataColumns.map(c => ({ key: c.key, header: c.header })),
-              visible:  visibleCols,
+              all: allDataColumns.map(c => ({ key: c.key, header: c.header })),
+              visible: visibleCols,
               onChange: setVisibleCols,
             }}
             className="flex-1 min-h-0"

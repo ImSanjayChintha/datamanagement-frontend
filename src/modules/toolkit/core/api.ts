@@ -7,7 +7,7 @@
  *   import { toolkitTablesApi, toolkitAiApi, toolkitDataApi } from '@/modules/toolkit/core/api';
  */
 
-import { post } from '@/core/api';
+import { post,postBlob } from '@/core/api';
 import type { LangOption, TranslationMap } from '@/types/shared';
 import type {
   ToolkitSchema,
@@ -211,6 +211,11 @@ export interface SqlExecResult {
   status?: string;
   saved_object?: ToolkitSavedObject | null;
 }
+
+export const toolkitExportApi = {
+  template: (body: { family_code: string; endpoint: string }) =>
+    postBlob('/admin/toolkit/export/template', body),
+};
 
 export const toolkitSqlApi = {
   validate: (sql: string) =>

@@ -47,3 +47,21 @@ export const authApi = {
   changePassword: (data: { current_password?: string; new_password: string }) =>
     post<{ changed: boolean }>('/auth/admin/change-password', data),
 };
+
+export async function postBlob(
+  path: string,
+  body: unknown = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await apiClient.post(path, body, { responseType: 'blob' });
+  const blob = res.data as Blob;
+
+  // Backend errors return JSON with the same envelope shape
+  if (blob.type.includes('application/json')) {
+    const parsed = JSON.parse(await blob.text()) as { success?: boolean; error?: string };
+    throw new Error(parsed.error || 'Request failed');
+  }
+
+  const disposition = String(res.headers['content-disposition'] ?? '');
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  return { blob, filename: match?.[1] ?? null };
+}

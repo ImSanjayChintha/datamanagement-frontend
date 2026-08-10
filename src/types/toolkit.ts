@@ -122,6 +122,7 @@ export interface PageDef {
   list_endpoint:   string;
   upsert_endpoint: string;
   delete_endpoint: string;
+  export_endpoint: string;
   inserted_at:     string;
   modified_at:     string | null;
 }

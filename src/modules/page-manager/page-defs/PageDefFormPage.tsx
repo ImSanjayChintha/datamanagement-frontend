@@ -285,6 +285,7 @@ export default function PageDefFormPage() {
   const [listEndpoint,   setListEndpoint]   = useState('');
   const [upsertEndpoint, setUpsertEndpoint] = useState('');
   const [deleteEndpoint, setDeleteEndpoint] = useState('');
+  const [exportEndpoint, setExportEndpoint] = useState('');
 
   const [cols,          setCols]          = useState<ColDraft[]>([]);
   const [fldCfg,        setFldCfg]       = useState<FieldDraft[]>([]);
@@ -349,6 +350,7 @@ export default function PageDefFormPage() {
       setListEndpoint(def.list_endpoint ?? '');
       setUpsertEndpoint(def.upsert_endpoint ?? '');
       setDeleteEndpoint(def.delete_endpoint ?? '');
+      setExportEndpoint(def.export_endpoint ?? '');
       setStaticFilters(
         Object.entries(def.list_config?.static_filters ?? {})
           .map(([field, value]) => ({ field, value: String(value) }))
@@ -703,6 +705,7 @@ export default function PageDefFormPage() {
                   { label: 'List endpoint',         val: listEndpoint,   set: setListEndpoint,   action: 'list'   },
                   { label: 'Upsert / Insert endpoint', val: upsertEndpoint, set: setUpsertEndpoint, action: 'upsert' },
                   { label: 'Delete endpoint',       val: deleteEndpoint, set: setDeleteEndpoint, action: 'delete' },
+                  { label: 'Export endpoint',       val: exportEndpoint, set: setExportEndpoint, action: 'export' },
                 ] as const).map(({ label, val, set }) => (
                   <div key={label}>
                     <label className="label">{label}</label>
