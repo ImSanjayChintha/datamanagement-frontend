@@ -20,10 +20,10 @@ import type { ToolkitField, ToolkitFieldOption } from '@/types/toolkit';
 
 // ── API instances ─────────────────────────────────────────────────────────────
 
-const productsApi = makeEntityApi('products',          'products');
-const familiesApi = makeEntityApi('families',          'families');
-const groupsApi   = makeEntityApi('attribute_groups',  'attribute_groups');
-const attrsApi    = makeEntityApi('attributes',        'attributes');
+const productsApi = makeEntityApi('products', 'products');
+const familiesApi = makeEntityApi('families', 'families');
+const groupsApi = makeEntityApi('attribute_groups', 'attribute_groups');
+const attrsApi = makeEntityApi('attributes', 'attributes');
 const famAttrsApi = makeEntityApi('family_attributes', 'family_attributes');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -32,8 +32,8 @@ type Row = Record<string, unknown>;
 
 interface TableDef {
   has_label: boolean;
-  fields:    ToolkitField[];
-  options:   ToolkitFieldOption[];
+  fields: ToolkitField[];
+  options: ToolkitFieldOption[];
 }
 
 // Maps component_type → DynamicFieldInput field_type (same as PimFormPage)
@@ -75,16 +75,16 @@ const textareaCls = clsx(
 
 const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5';
 
-const tblInputCls    = 'input';
+const tblInputCls = 'input';
 const tblTextareaCls = 'input resize-none';
 
 // ── Auto-tag computation ──────────────────────────────────────────────────────
 
 function computeAutoTags(params: {
-  code:         string;
-  name:         string;
-  familyCode:   string;
-  families:     Row[];
+  code: string;
+  name: string;
+  familyCode: string;
+  families: Row[];
   categoryPath: CategoryNode[] | null;
 }): string[] {
   const { code, name, familyCode, families, categoryPath } = params;
@@ -160,11 +160,11 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
 // Renders inline in the attribute pivot table — uses compact tbl* styles.
 
 function AttrValueField({ attr, value, onChange }: {
-  attr:     Row;
-  value:    unknown;
+  attr: Row;
+  value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const type    = (attr.attr_type as string) ?? 'text';
+  const type = (attr.attr_type as string) ?? 'text';
   const options = (attr.options as { code: string; label: unknown }[] | null) ?? [];
 
   if (type === 'boolean' || type === 'toggle') {
@@ -184,10 +184,10 @@ function AttrValueField({ attr, value, onChange }: {
   if (type === 'integer' || type === 'number' || type === 'decimal') {
     return (
       <input type="number"
-             value={value === undefined || value === null ? '' : String(value)}
-             onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
-             className={tblInputCls}
-             step={type === 'decimal' ? '0.01' : '1'} />
+        value={value === undefined || value === null ? '' : String(value)}
+        onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        className={tblInputCls}
+        step={type === 'decimal' ? '0.01' : '1'} />
     );
   }
 
@@ -214,7 +214,7 @@ function AttrValueField({ attr, value, onChange }: {
 
   if (type === 'multiselect') {
     const selected = Array.isArray(value) ? (value as string[]) : [];
-    const toggle   = (code: string) =>
+    const toggle = (code: string) =>
       onChange(selected.includes(code) ? selected.filter(c => c !== code) : [...selected, code]);
     return (
       <div className="flex flex-wrap gap-1 py-0.5">
@@ -222,12 +222,12 @@ function AttrValueField({ attr, value, onChange }: {
           const on = selected.includes(o.code);
           return (
             <button key={o.code} type="button" onClick={() => toggle(o.code)}
-                    className={clsx(
-                      'px-2 py-0.5 rounded text-[11px] font-medium border transition-colors',
-                      on
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600',
-                    )}>
+              className={clsx(
+                'px-2 py-0.5 rounded text-[11px] font-medium border transition-colors',
+                on
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-600',
+              )}>
               {catLabel(o.label)}
             </button>
           );
@@ -243,11 +243,11 @@ function AttrValueField({ attr, value, onChange }: {
 // ── Card wrapper ──────────────────────────────────────────────────────────────
 
 function Card({ icon: Icon, title, subtitle, children, accent }: {
-  icon:     React.ElementType;
-  title:    string;
+  icon: React.ElementType;
+  title: string;
   subtitle?: string;
   children: React.ReactNode;
-  accent?:  'default' | 'amber';
+  accent?: 'default' | 'amber';
 }) {
   const isAmber = accent === 'amber';
   return (
@@ -279,24 +279,24 @@ function Card({ icon: Icon, title, subtitle, children, accent }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ProductFormPage() {
-  const { id }   = useParams<{ id?: string }>();
+  const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const qc       = useQueryClient();
-  const isEdit   = !!id;
+  const qc = useQueryClient();
+  const isEdit = !!id;
 
   // ── Form state ──
 
   // Dynamic fields from page_definition (code, name, sort_order, status, hs_code, etc.)
-  const [formValues,   setFormValues]   = useState<Row>({});
+  const [formValues, setFormValues] = useState<Row>({});
   // Custom-section state (Classification, Attribute Values, Tags, header toggle)
-  const [isActive,     setIsActive]     = useState(true);
-  const [familyCode,   setFamilyCode]   = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [familyCode, setFamilyCode] = useState('');
   const [categoryPath, setCategoryPath] = useState<CategoryNode[] | null>(null);
-  const [attrValues,   setAttrValues]   = useState<Record<string, unknown>>({});
-  const [manualTags,   setManualTags]   = useState<string[]>([]);
-  const [tagInput,     setTagInput]     = useState('');
-  const [errors,       setErrors]       = useState<Record<string, string>>({});
-  const [showPicker,   setShowPicker]   = useState(false);
+  const [attrValues, setAttrValues] = useState<Record<string, unknown>>({});
+  const [manualTags, setManualTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPicker, setShowPicker] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
   // Derived for breadcrumb, auto-tags, and validation
@@ -307,14 +307,14 @@ export default function ProductFormPage() {
 
   const { data: pageDef } = useQuery({
     queryKey: QK.pageDef('products'),
-    queryFn:  () => pageDefsApi.get('products'),
+    queryFn: () => pageDefsApi.get('products'),
     staleTime: 5 * 60_000,
     retry: false,
   });
 
   const { data: tableDef } = useQuery<TableDef>({
     queryKey: QK.table('products'),
-    queryFn:  () => productsApi.meta() as Promise<TableDef>,
+    queryFn: () => productsApi.meta() as Promise<TableDef>,
     staleTime: 5 * 60_000,
   });
 
@@ -322,30 +322,30 @@ export default function ProductFormPage() {
 
   const { data: familyRes } = useQuery({
     queryKey: ['pim-families-all'],
-    queryFn:  () => familiesApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
+    queryFn: () => familiesApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
     staleTime: 5 * 60_000,
   });
 
   const { data: groupRes } = useQuery({
     queryKey: ['pim-attr-groups-all'],
-    queryFn:  () => groupsApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
+    queryFn: () => groupsApi.list({ limit: 200, sort: [{ field: 'sort_order', direction: 'asc' }] }),
     staleTime: 5 * 60_000,
   });
 
   const { data: attrRes } = useQuery({
     queryKey: ['pim-attrs-all'],
-    queryFn:  () => attrsApi.list({ limit: 2000, sort: [{ field: 'sort_order', direction: 'asc' }] }),
+    queryFn: () => attrsApi.list({ limit: 2000, sort: [{ field: 'sort_order', direction: 'asc' }] }),
     staleTime: 5 * 60_000,
   });
 
   const { data: famAttrRes, isLoading: loadingFamAttrs } = useQuery({
     queryKey: ['pim-family-attrs', familyCode],
-    queryFn:  () => famAttrsApi.list({
+    queryFn: () => famAttrsApi.list({
       filters: { family_code: familyCode, is_active: true },
       limit: 500,
-      sort:  [{ field: 'sort_order', direction: 'asc' }],
+      sort: [{ field: 'sort_order', direction: 'asc' }],
     }),
-    enabled:   !!familyCode,
+    enabled: !!familyCode,
     staleTime: 5 * 60_000,
   });
 
@@ -353,25 +353,25 @@ export default function ProductFormPage() {
 
   const { data: existing, isLoading: loadingProduct } = useQuery({
     queryKey: ['pim-product', id],
-    queryFn:  () => productsApi.get(id!),
-    enabled:  isEdit,
+    queryFn: () => productsApi.get(id!),
+    enabled: isEdit,
     staleTime: 0,
   });
 
   // ── Derived data ──
 
-  const families  = useMemo(() => (familyRes?.rows ?? []) as Row[], [familyRes]);
-  const allGroups = useMemo(() => (groupRes?.rows  ?? []) as Row[], [groupRes]);
-  const allAttrs  = useMemo(() => (attrRes?.rows   ?? []) as Row[], [attrRes]);
-  const famAttrs  = useMemo(() => (famAttrRes?.rows ?? []) as Row[], [famAttrRes]);
+  const families = useMemo(() => (familyRes?.rows ?? []) as Row[], [familyRes]);
+  const allGroups = useMemo(() => (groupRes?.rows ?? []) as Row[], [groupRes]);
+  const allAttrs = useMemo(() => (attrRes?.rows ?? []) as Row[], [attrRes]);
+  const famAttrs = useMemo(() => (famAttrRes?.rows ?? []) as Row[], [famAttrRes]);
 
-  const attrMap  = useMemo(() => new Map(allAttrs.map(a => [a.code as string, a])),  [allAttrs]);
+  const attrMap = useMemo(() => new Map(allAttrs.map(a => [a.code as string, a])), [allAttrs]);
   const groupMap = useMemo(() => new Map(allGroups.map(g => [g.code as string, g])), [allGroups]);
 
   // ── Page-def driven field list (excludes reserved custom-section fields) ──
 
   const cfgMap = useMemo(
-    () => new Map((pageDef?.form_config?.fields ?? []).map((c: { code: string }) => [c.code, c])),
+    () => new Map((pageDef?.form_config?.fields ?? []).map(c => [c.code, c])),
     [pageDef],
   );
 
@@ -381,16 +381,16 @@ export default function ProductFormPage() {
     const cfgFields = pageDef?.form_config?.fields ?? [];
 
     const applyOverrides = (f: ToolkitField): ToolkitField => {
-      const cfg        = cfgMap.get(f.code);
+      const cfg = cfgMap.get(f.code);
       const componentFt = cfg?.component_type
         ? (COMPONENT_TYPE_FIELD[cfg.component_type] ?? cfg.component_type)
         : null;
       return {
         ...f,
         ...(cfg?.ref_endpoint ? { config: { ...f.config, gateway_endpoint: cfg.ref_endpoint } } : {}),
-        ...(cfg?.multilingual  ? { is_multilingual: true } : {}),
+        ...(cfg?.multilingual ? { is_multilingual: true } : {}),
         ...(cfg?.required != null ? { is_required: cfg.required } : {}),
-        ...(componentFt ? { field_type: componentFt } : {}),
+        ...(componentFt ? { field_type: componentFt as ToolkitField['field_type'] } : {}),
       };
     };
 
@@ -433,7 +433,7 @@ export default function ProductFormPage() {
     const init: Row = {};
     for (const f of tableDef.fields) {
       if (RESERVED.has(f.code)) continue;
-      const cfg     = cfgMap.get(f.code);
+      const cfg = cfgMap.get(f.code);
       const dataKey = (cfg as { bindkey?: string } | undefined)?.bindkey ?? f.code;
       if ((cfg as { component_type?: string } | undefined)?.component_type === 'select_multi') {
         const val = existing[dataKey];
@@ -447,12 +447,24 @@ export default function ProductFormPage() {
     setFormValues(init);
 
     // Separate stored tags into auto vs manual
-    const loadedCode       = String(existing.code ?? '');
-    const loadedName       = String(existing.name ?? '');
+    const loadedCode = String(existing.code ?? '');
+    const loadedName = String(existing.name ?? '');
     const loadedFamilyCode = String(existing.family_code ?? '');
-    const loadedCategory   = Array.isArray(existing.categories) ? existing.categories as CategoryNode[] : null;
-    const storedTags       = (existing.tags as string[] | null) ?? [];
-    const computedAutoSet  = new Set(computeAutoTags({
+    const loadedCategory = Array.isArray(existing.categories) ? existing.categories as CategoryNode[] : null;
+    const rawTags = existing.tags;
+    const storedTags: string[] = Array.isArray(rawTags)
+      ? rawTags.map(String)
+      : typeof rawTags === 'string' && rawTags.trim()
+        ? (() => {
+          try {
+            const parsed = JSON.parse(rawTags);
+            return Array.isArray(parsed) ? parsed.map(String) : [rawTags];
+          } catch {
+            return [rawTags];
+          }
+        })()
+        : [];
+    const computedAutoSet = new Set(computeAutoTags({
       code: loadedCode, name: loadedName,
       familyCode: loadedFamilyCode, families,
       categoryPath: loadedCategory,
@@ -533,17 +545,17 @@ export default function ProductFormPage() {
 
       const payload: Row = {
         ...cleanedValues,
-        is_active:   isActive,
+        is_active: isActive,
         family_code: familyCode || null,
-        categories:  categoryPath,
-        values:      attrValues,
-        tags:        allTags,
+        categories: categoryPath,
+        values: attrValues,
+        tags: allTags,
       };
       if (isEdit && id) payload.id = id;
       return productsApi.upsert(payload);
     },
     onSuccess: (result) => {
-      const res   = (result as Row) ?? {};
+      const res = (result as Row) ?? {};
       const newId = res.id ?? (res.data as Row)?.id;
       toast.success(isEdit ? 'Saved successfully' : 'Product created');
       qc.invalidateQueries({ queryKey: ['pim-products'] });
@@ -561,12 +573,12 @@ export default function ProductFormPage() {
     const errs: Record<string, string> = {};
     for (const f of displayFields) {
       if (!f.is_required) continue;
-      const cfg         = cfgMap.get(f.code);
+      const cfg = cfgMap.get(f.code);
       const modeDisabled = isEdit
         ? (cfg as { edit_mode?: string } | undefined)?.edit_mode === 'disabled'
         : (cfg as { add_mode?: string } | undefined)?.add_mode === 'disabled';
       if (modeDisabled) continue;
-      const val     = formValues[f.code];
+      const val = formValues[f.code];
       const isEmpty = val === undefined || val === null || val === ''
         || (Array.isArray(val) && val.length === 0);
       if (!isEmpty) continue;
@@ -604,7 +616,7 @@ export default function ProductFormPage() {
 
         <div className="flex items-center gap-1.5 text-[12px] text-gray-400 dark:text-gray-500 min-w-0">
           <span className="hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer shrink-0"
-                onClick={() => navigate('/pim/products')}>
+            onClick={() => navigate('/pim/products')}>
             Products
           </span>
           <ChevronRight size={11} className="shrink-0" />
@@ -671,8 +683,8 @@ export default function ProductFormPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {displayFields.map(f => {
-                      const cfg          = cfgMap.get(f.code);
-                      const fullWidth    = f.is_multilingual || FULL_WIDTH_TYPES.has(f.field_type);
+                      const cfg = cfgMap.get(f.code);
+                      const fullWidth = f.is_multilingual || FULL_WIDTH_TYPES.has(f.field_type);
                       const modeDisabled = isEdit
                         ? (cfg as { edit_mode?: string } | undefined)?.edit_mode === 'disabled'
                         : (cfg as { add_mode?: string } | undefined)?.add_mode === 'disabled';
@@ -680,7 +692,7 @@ export default function ProductFormPage() {
                         <div
                           key={f.id ?? f.code}
                           className={clsx(
-                            fullWidth    && 'col-span-full',
+                            fullWidth && 'col-span-full',
                             modeDisabled && 'opacity-60',
                           )}
                         >
@@ -778,7 +790,7 @@ export default function ProductFormPage() {
                     </button>
                     {categoryPath && (
                       <button type="button" onClick={() => setCategoryPath(null)}
-                              className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1">
+                        className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1">
                         <X size={10} /> Clear category
                       </button>
                     )}
@@ -929,10 +941,10 @@ export default function ProductFormPage() {
                   </colgroup>
                   <tbody>
                     {orderedGroups.map((gc, idx) => {
-                      const group    = groupMap.get(gc);
-                      const items    = groupedAttrs.get(gc) ?? [];
+                      const group = groupMap.get(gc);
+                      const items = groupedAttrs.get(gc) ?? [];
                       const groupLbl = gc === '__ungrouped__' ? 'Other' : (catLabel(group?.name) || gc);
-                      const filled   = items.filter(({ attr }) => {
+                      const filled = items.filter(({ attr }) => {
                         const v = attrValues[attr.code as string];
                         return v !== undefined && v !== null && v !== ''
                           && !(Array.isArray(v) && v.length === 0);
@@ -967,14 +979,14 @@ export default function ProductFormPage() {
                           {/* ── Attribute rows ── */}
                           {items.map(({ attr }) => {
                             const attrCode = attr.code as string;
-                            const isReq    = requiredAttrCodes.has(attrCode);
-                            const val      = attrValues[attrCode];
+                            const isReq = requiredAttrCodes.has(attrCode);
+                            const val = attrValues[attrCode];
                             const isFilled = val !== undefined && val !== null && val !== ''
                               && !(Array.isArray(val) && val.length === 0);
 
                             return (
                               <tr key={attrCode}
-                                  className="border-b border-gray-50 dark:border-gray-800/50 last:border-0">
+                                className="border-b border-gray-50 dark:border-gray-800/50 last:border-0">
                                 {/* Name cell */}
                                 <td className="py-1.5 pr-4 align-top">
                                   <div className="flex items-start gap-1.5 pt-1">

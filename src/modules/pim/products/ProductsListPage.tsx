@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus, ChevronRight, Loader2, Pencil, Trash2,
   Package, X, Users, FolderTree,
-  Download,
+  Download, Upload,
   FileSpreadsheet
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -19,10 +19,14 @@ import { makeEntityApi, pimCategoriesApi } from '@/modules/pim/api';
 import { catLabel } from './CategoryPicker';
 import type { ToolkitField, ToolkitFieldOption } from '@/types/toolkit';
 import { toolkitExportApi } from '@/modules/toolkit/core/api';
+import { ReactSpreadsheetImport } from 'react-spreadsheet-import';
+import { ChakraProvider } from '@chakra-ui/react';
+import { apiClient } from '@/core/api';
 // ── API instances ─────────────────────────────────────────────────────────────
 
 const productsApi = makeEntityApi('products', 'products');
 const familiesApi = makeEntityApi('families', 'families');
+const famAttrsApi = makeEntityApi('family_attributes', 'family_attributes');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -188,6 +192,37 @@ function CategoryTree({
   );
 }
 
+// ── Import template validation ────────────────────────────────────────────────
+
+function normalizeHeader(h: unknown): string {
+  return String(h ?? '').trim().toLowerCase();
+}
+
+function validateTemplateHeaders(
+  headerValues: Array<string | undefined>,
+  expectedKeys: string[],
+  requiredKeys: string[],
+  familyCode: string | null,
+): string | null {
+  const uploaded = new Set(headerValues.map(normalizeHeader).filter(Boolean));
+  const expected = expectedKeys.map(normalizeHeader);
+  const required = requiredKeys.map(normalizeHeader);
+
+  const missingRequired = required.filter(r => !uploaded.has(r));
+  if (missingRequired.length) {
+    return `Invalid template: missing mandatory column(s): ${missingRequired.join(', ')}. Download the template for family "${familyCode ?? ''}".`;
+  }
+
+  const matched = expected.filter(k => uploaded.has(k)).length;
+  const coverage = expected.length ? matched / expected.length : 0;
+  if (coverage < 0.5) {
+    return `Invalid template: only ${matched}/${expected.length} expected columns matched. Use Download Template for family "${familyCode ?? ''}".`;
+  }
+  return null;
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const ENTITY = 'products';
@@ -212,8 +247,10 @@ export default function ProductsListPage() {
   const [visibleCols, setVisibleCols] = useState<string[]>([]);
   const [deleting, setDeleting] = useState<string | number | null>(null);
   const colsInitialized = useRef(false);
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => { setPage(1); }, [filterType, selectedFamily, selectedCat, colFilters, showInactive]);
+
 
   // ── Page definition — drives columns ──
 
@@ -231,6 +268,121 @@ export default function ProductsListPage() {
     retry: false,
     enabled: !!pageDef,
   });
+
+  // ── Import (family-aware fields + upsert) ──
+
+  const { data: famAttrRes } = useQuery({
+    queryKey: ['pim-fam-attrs-import', selectedFamily],
+    queryFn: () => famAttrsApi.list({
+      filters: { family_code: selectedFamily, is_active: true },
+      limit: 500,
+    }),
+    enabled: !!selectedFamily,
+    staleTime: 60_000,
+  });
+
+  const PRODUCT_SKIP = new Set(['id', 'values', 'family_code']);
+
+  const productColumnKeys = useMemo(() => {
+    const fromMeta = (tableDef?.fields ?? [])
+      .map(f => f.code)
+      .filter(c => !PRODUCT_SKIP.has(c));
+    return fromMeta.length
+      ? fromMeta
+      : ['code', 'name', 'sort_order', 'is_active', 'hs_code'];
+  }, [tableDef]);
+
+  const attributeCodes = useMemo(() => {
+    const rows = (famAttrRes?.rows ?? []) as Row[];
+    return rows
+      .map(r => String(r.attribute_code ?? ''))
+      .filter(Boolean);
+  }, [famAttrRes]);
+
+  const requiredAttrCodes = useMemo(() => {
+    const rows = (famAttrRes?.rows ?? []) as Row[];
+    return rows
+      .filter(r => r.is_required === true)
+      .map(r => String(r.attribute_code ?? ''))
+      .filter(Boolean);
+  }, [famAttrRes]);
+
+  const mandatoryImportKeys = useMemo(
+    () => ['code', 'name', ...requiredAttrCodes],
+    [requiredAttrCodes],
+  );
+
+  const importFields = useMemo(() => {
+    const requiredSet = new Set(mandatoryImportKeys);
+
+    const productFields = productColumnKeys.map(code => ({
+      label: code,
+      key: code,
+      alternateMatches: [code],
+      fieldType: { type: 'input' as const },
+      validations: requiredSet.has(code)
+        ? [{ rule: 'required' as const, errorMessage: `${code} is required` }]
+        : [],
+    }));
+
+    const attrFields = attributeCodes.map(code => ({
+      label: code,
+      key: code,
+      alternateMatches: [code],
+      fieldType: { type: 'input' as const },
+      validations: requiredSet.has(code)
+        ? [{ rule: 'required' as const, errorMessage: `${code} is required` }]
+        : ([] as { rule: 'required'; errorMessage: string }[]),
+    }));
+
+    return [...productFields, ...attrFields];
+  }, [productColumnKeys, attributeCodes, mandatoryImportKeys]);
+
+  const handleImportSubmit = async (data: { validData: Record<string, any>[], invalidData?: Record<string, any>[]; }) => {
+    if (!selectedFamily) {
+      toast.error('Select a family first');
+      return;
+    }
+
+    const rows = data.validData ?? [];
+    const invalid = data.invalidData?.length ?? 0;
+
+    if (!rows.length) {
+      toast.error('Invalid template or no valid rows to import');
+      return;
+    }
+
+    const bad = rows.filter(
+      r => !String(r.code ?? '').trim() || !String(r.name ?? '').trim(),
+    );
+    if (bad.length) {
+      toast.error(`Invalid data: ${bad.length} row(s) missing code/name`);
+      return;
+    }
+
+    if (invalid > 0) {
+      toast.error(`Fix ${invalid} invalid row(s) before importing`);
+      return;
+    }
+    try {
+      const result = await apiClient.post<Record<string, unknown>>(
+        '/admin/toolkit/import/products', {
+          family_code: selectedFamily,
+          rows,
+        },
+      );
+
+      const body = (result.data ?? result) as Record<string, unknown>;
+      const payload = (body.data ?? body) as Record<string, unknown>;
+      
+
+      toast.success(`Import queued${payload.job_id ? ` (${payload.job_id})` : ''}`);
+      qc.invalidateQueries({ queryKey: ['pim-products'] });
+      setImportOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Import failed');
+    }
+  };
 
   // ── Families for left panel ──
 
@@ -600,6 +752,26 @@ export default function ProductsListPage() {
           </label>
 
           <button
+            type="button"
+            onClick={() => {
+              if (!selectedFamily) {
+                toast.error('Select a family first');
+                return;
+              }
+              setImportOpen(true);
+            }}
+            title="Import products from Excel"
+            aria-label="Import products from Excel"
+            className="inline-flex items-center justify-center p-2 rounded-lg
+             border border-gray-200 dark:border-gray-700
+             text-gray-600 dark:text-gray-300
+             hover:bg-gray-50 dark:hover:bg-gray-800
+             transition-colors shadow-sm shrink-0"
+          >
+            <Upload size={14} />
+          </button>
+
+          <button
             onClick={() => exportDataMut.mutate()}
             disabled={exportDataMut.isPending}
             title="Export all products for the selected family to Excel"
@@ -611,7 +783,7 @@ export default function ProductsListPage() {
              transition-colors shadow-sm shrink-0
              disabled:opacity-50 disabled:cursor-not-allowed"
           >
-           {exportDataMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+            {exportDataMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
           </button>
 
           <button
@@ -688,6 +860,34 @@ export default function ProductsListPage() {
           />
         )}
       </div>
+
+      {importOpen && (
+        <ChakraProvider>
+          <ReactSpreadsheetImport
+            isOpen={importOpen}
+            onClose={() => setImportOpen(false)}
+            onSubmit={handleImportSubmit}
+            fields={importFields}
+            autoMapHeaders
+            autoMapDistance={1}
+            allowInvalidSubmit={false}
+            maxFileSize={10 * 1024 * 1024}
+            selectHeaderStepHook={async (headerValues, data) => {
+              const err = validateTemplateHeaders(
+                headerValues,
+                importFields.map(f => f.key),
+                mandatoryImportKeys,
+                selectedFamily,
+              )
+              if (err) {
+                toast.error(err);
+                throw new Error(err);
+              }
+              return { headerValues, data };
+            }}
+          />
+        </ChakraProvider>
+      )}
 
       <ConfirmDialog
         open={deleting !== null}
