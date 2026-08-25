@@ -22,6 +22,7 @@ import { toolkitExportApi } from '@/modules/toolkit/core/api';
 import { ReactSpreadsheetImport } from 'react-spreadsheet-import';
 import { ChakraProvider } from '@chakra-ui/react';
 import { apiClient } from '@/core/api';
+import { watchImportJob } from '@/core/importNotifications';
 // ── API instances ─────────────────────────────────────────────────────────────
 
 const productsApi = makeEntityApi('products', 'products');
@@ -281,7 +282,19 @@ export default function ProductsListPage() {
     staleTime: 60_000,
   });
 
-  const PRODUCT_SKIP = new Set(['id', 'values', 'family_code']);
+  const PRODUCT_SKIP = new Set([
+    'id',
+    'values',
+    'family_code',
+    'inserted_at',
+    'inserted_by',
+    'modified_at',
+    'modified_by',
+    'launched_at',
+    'discontinued_at',
+    'created_at',
+    'updated_at',
+  ]);
 
   const productColumnKeys = useMemo(() => {
     const fromMeta = (tableDef?.fields ?? [])
@@ -374,10 +387,15 @@ export default function ProductsListPage() {
 
       const body = (result.data ?? result) as Record<string, unknown>;
       const payload = (body.data ?? body) as Record<string, unknown>;
-      
+      const jobId = payload.job_id ? String(payload.job_id) : '';
+      if (jobId) watchImportJob(jobId);
 
-      toast.success(`Import queued${payload.job_id ? ` (${payload.job_id})` : ''}`);
-      qc.invalidateQueries({ queryKey: ['pim-products'] });
+      toast.success(
+        jobId
+          ? 'Import queued — you’ll get a notification when it finishes'
+          : 'Import queued',
+      );
+      // Product list refreshes on IMPORT_COMPLETED via useImportJobNotifications
       setImportOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Import failed');

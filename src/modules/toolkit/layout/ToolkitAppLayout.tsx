@@ -4,7 +4,6 @@ import { useIsFetching } from '@tanstack/react-query';
 import AppSidebar from '@/components/layout/AppSidebar';
 import PageLoader from '@/components/ui/PageLoader';
 
-
 function usePageLoader() {
   const isFetching = useIsFetching();
   const [show, setShow] = useState(false);
