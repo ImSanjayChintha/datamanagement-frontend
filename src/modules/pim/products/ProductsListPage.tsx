@@ -23,6 +23,7 @@ import { ReactSpreadsheetImport } from 'react-spreadsheet-import';
 import { ChakraProvider } from '@chakra-ui/react';
 import { apiClient } from '@/core/api';
 import { watchImportJob } from '@/core/importNotifications';
+import { useNotificationStore } from '@/core/notificationStore';
 // ── API instances ─────────────────────────────────────────────────────────────
 
 const productsApi = makeEntityApi('products', 'products');
@@ -388,14 +389,18 @@ export default function ProductsListPage() {
       const body = (result.data ?? result) as Record<string, unknown>;
       const payload = (body.data ?? body) as Record<string, unknown>;
       const jobId = payload.job_id ? String(payload.job_id) : '';
-      if (jobId) watchImportJob(jobId);
-
-      toast.success(
-        jobId
-          ? 'Import queued — you’ll get a notification when it finishes'
-          : 'Import queued',
-      );
-      // Product list refreshes on IMPORT_COMPLETED via useImportJobNotifications
+      if (jobId) {
+        watchImportJob(jobId);
+        useNotificationStore.getState().add({
+          id: `queued-${jobId}`,
+          jobId,
+          jobType: 'import',
+          kind: 'info',
+          title: 'Import queued',
+          message: 'Running in the background. You’ll see a notification when it finishes.',
+        });
+        toast.success('Import started and queued. You’ll receive a notification when it’s done.');
+      }
       setImportOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Import failed');
@@ -487,9 +492,9 @@ export default function ProductsListPage() {
   const total = isPlaceholderData ? 0 : result?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
-  // ── Export Template ──
+  // ── Export Template (async job) ──
   const exportMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const endpoint = (pageDef?.export_endpoint ?? '').trim();
       if (!selectedFamily) throw new Error('Select a family first');
       if (!endpoint) throw new Error('Export endpoint is not configured for this page');
@@ -498,34 +503,44 @@ export default function ProductsListPage() {
         endpoint,
       });
     },
-    onSuccess: ({ blob, filename }) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename || `products-${selectedFamily}-template.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Template downloaded');
+    onSuccess: (data) => {
+      if (data?.job_id) {
+        watchImportJob(data.job_id);
+        useNotificationStore.getState().add({
+          id: `queued-${data.job_id}`,
+          jobId: data.job_id,
+          jobType: 'export_template',
+          kind: 'info',
+          title: 'Template queued',
+          message: 'Preparing your download in the background.',
+        });
+        toast.success('Template download started and queued. You’ll receive a notification when it’s done.');
+      }
     },
     onError: (e: Error) => toast.error(e.message || 'Download failed'),
   });
 
   const exportDataMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selectedFamily) throw new Error('Select a family first');
       return toolkitExportApi.data({
         family_code: selectedFamily,
         endpoint: '/gateway/products/export-data',
       });
     },
-    onSuccess: ({ blob, filename }) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename || `products-${selectedFamily}-export.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Export downloaded');
+    onSuccess: (data) => {
+      if (data?.job_id) {
+        watchImportJob(data.job_id);
+        useNotificationStore.getState().add({
+          id: `queued-${data.job_id}`,
+          jobId: data.job_id,
+          jobType: 'export_data',
+          kind: 'info',
+          title: 'Export queued',
+          message: 'Preparing your Excel file in the background.',
+        });
+        toast.success('Export started and queued. You’ll receive a notification when it’s done.');
+      }
     },
     onError: (e: Error) => toast.error(e.message || 'Export failed'),
   });

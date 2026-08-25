@@ -7,7 +7,7 @@
  *   import { toolkitTablesApi, toolkitAiApi, toolkitDataApi } from '@/modules/toolkit/core/api';
  */
 
-import { post,postBlob } from '@/core/api';
+import { post } from '@/core/api';
 import type { LangOption, TranslationMap } from '@/types/shared';
 import type {
   ToolkitSchema,
@@ -106,10 +106,18 @@ schemaContext: (codes?: string[]) =>
 };
 
 export const toolkitExportApi = {
+  /** Enqueue template job — returns { job_id, status, job_type }. File arrives via SSE + auto-download. */
   template: (body: { family_code: string; endpoint: string }) =>
-    postBlob('/admin/toolkit/export/template', body),
+    post<{ job_id: string; status: string; job_type: string }>(
+      '/admin/toolkit/export/template',
+      body,
+    ),
+  /** Enqueue data export job. */
   data: (body: { family_code: string; endpoint: string }) =>
-    postBlob('/admin/toolkit/export/data', body),
+    post<{ job_id: string; status: string; job_type: string }>(
+      '/admin/toolkit/export/data',
+      body,
+    ),
 };
 
 // ── Fields ────────────────────────────────────────────────────────────────────

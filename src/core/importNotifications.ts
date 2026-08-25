@@ -1,28 +1,24 @@
 /**
- * Import job SSE notifications + refresh recovery (PostgreSQL is source of truth).
+ * Toolkit job SSE notifications (import + export) + refresh recovery.
  * One connection per authenticated session — mounted from main.tsx.
- *
- * Reliability:
- *  - SSE for instant completion/failure toasts
- *  - PG recovery on connect/reconnect
- *  - Watched job IDs (from enqueue) get a light status check until terminal
- *    so a missed Redis event still surfaces a toast
+ * Terminal events go to the notification bell (not toast popups).
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
 import { apiClient } from '@/core/api';
 import { useAuthStore } from '@/core/auth';
+import { useNotificationStore } from '@/core/notificationStore';
 
 const NOTIFIED_KEY = 'import-notified-job-ids';
 const WATCH_KEY = 'import-watch-job-ids';
 const SSE_PATH = '/admin/toolkit/import/events';
 const WATCH_POLL_MS = 8_000;
 
-type ImportEventPayload = {
+type JobEventPayload = {
   event?: string;
   job_id?: string;
   status?: string;
+  job_type?: string;
   file_name?: string | null;
   family_code?: string | null;
   success_rows?: number;
@@ -30,12 +26,14 @@ type ImportEventPayload = {
   source_rows?: number;
   error_message?: string;
   user_id?: number;
+  download_ready?: boolean;
 };
 
-type ImportJobRow = {
+type JobRow = {
   job_id?: string;
   id?: string;
   status?: string;
+  job_type?: string;
   file_name?: string | null;
   family_code?: string | null;
   success_rows?: number;
@@ -44,6 +42,7 @@ type ImportJobRow = {
   rows_written?: number;
   error_message?: string | null;
   completed_at?: string | null;
+  result_file_path?: string | null;
 };
 
 function loadIdSet(key: string): Set<string> {
@@ -83,42 +82,116 @@ export function watchImportJob(jobId: string) {
   saveIdSet(WATCH_KEY, s);
 }
 
+export const watchToolkitJob = watchImportJob;
+
 function unwatchImportJob(jobId: string) {
   const s = loadIdSet(WATCH_KEY);
   s.delete(jobId);
   saveIdSet(WATCH_KEY, s);
 }
 
-function formatCompleted(p: ImportEventPayload | ImportJobRow) {
-  const name = p.file_name || p.family_code || 'Import';
-  const ok = p.success_rows ?? (p as ImportJobRow).rows_written ?? 0;
-  return `${name} — ${Number(ok).toLocaleString()} record(s) imported`;
+export async function downloadExportFile(jobId: string, fileName: string) {
+  const res = await apiClient.get(`/admin/toolkit/export/jobs/${jobId}/download`, {
+    responseType: 'blob',
+  });
+  const blob = res.data as Blob;
+  if (blob.type.includes('application/json')) {
+    const parsed = JSON.parse(await blob.text()) as { error?: string };
+    throw new Error(parsed.error || 'Download failed');
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'export.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function notifyTerminal(payload: ImportEventPayload | ImportJobRow, eventHint?: string) {
-  const jobId = String(payload.job_id || (payload as ImportJobRow).id || '');
-  if (!jobId || wasNotified(jobId)) return;
+function isExportJob(jobType?: string | null) {
+  return jobType === 'export_template' || jobType === 'export_data';
+}
+
+function isFailureEvent(event?: string, status?: string) {
+  return (
+    status === 'failed'
+    || event === 'IMPORT_FAILED'
+    || event === 'EXPORT_TEMPLATE_FAILED'
+    || event === 'EXPORT_DATA_FAILED'
+    || event === 'JOB_FAILED'
+  );
+}
+
+function isSuccessEvent(event?: string, status?: string) {
+  return (
+    status === 'completed'
+    || event === 'IMPORT_COMPLETED'
+    || event === 'EXPORT_TEMPLATE_COMPLETED'
+    || event === 'EXPORT_DATA_COMPLETED'
+    || event === 'JOB_COMPLETED'
+  );
+}
+
+function pushBell(payload: JobEventPayload | JobRow, eventHint?: string) {
+  const jobId = String(payload.job_id || (payload as JobRow).id || '');
+  if (!jobId || wasNotified(jobId)) return false;
 
   const status = payload.status;
-  const event =
-    eventHint ||
-    (status === 'completed' ? 'IMPORT_COMPLETED' : status === 'failed' ? 'IMPORT_FAILED' : '');
+  const event = eventHint || '';
+  const jobType = payload.job_type || 'import';
+  const add = useNotificationStore.getState().add;
 
-  if (event === 'IMPORT_COMPLETED' || status === 'completed') {
-    toast.success(`Import completed successfully. ${formatCompleted(payload)}`, {
-      duration: 7000,
-      id: `import-ok-${jobId}`,
+  if (isFailureEvent(event, status)) {
+    const label = isExportJob(jobType) ? 'Export' : 'Import';
+    const err = (payload as JobEventPayload).error_message || `${label} failed`;
+    add({
+      id: `job-${jobId}`,
+      jobId,
+      jobType,
+      kind: 'error',
+      title: `${label} failed`,
+      message: String(err).slice(0, 400),
     });
     markNotified(jobId);
     unwatchImportJob(jobId);
     return true;
   }
-  if (event === 'IMPORT_FAILED' || status === 'failed') {
-    const err = (payload as ImportEventPayload).error_message || 'Import failed';
-    toast.error(`Import failed: ${String(err).slice(0, 240)}`, {
-      duration: 9000,
-      id: `import-err-${jobId}`,
-    });
+
+  if (isSuccessEvent(event, status)) {
+    if (isExportJob(jobType)) {
+      const name = payload.file_name || 'Excel file';
+      const kindLabel = jobType === 'export_template' ? 'Template' : 'Export';
+      add({
+        id: `job-${jobId}`,
+        jobId,
+        jobType,
+        fileName: name,
+        downloadable: true,
+        kind: 'success',
+        title: `${kindLabel} ready`,
+        message: `${name} — click to download`,
+      });
+      void downloadExportFile(jobId, name).catch(() => {
+        add({
+          id: `job-${jobId}-dl`,
+          jobId,
+          jobType,
+          kind: 'error',
+          title: 'Download failed',
+          message: `Could not download ${name}. Open notifications and try again.`,
+        });
+      });
+    } else {
+      const rows = payload.success_rows ?? (payload as JobRow).rows_written ?? 0;
+      const name = payload.file_name || payload.family_code || 'Import';
+      add({
+        id: `job-${jobId}`,
+        jobId,
+        jobType,
+        kind: 'success',
+        title: 'Import completed',
+        message: `${name} — ${Number(rows).toLocaleString()} record(s) imported`,
+      });
+    }
     markNotified(jobId);
     unwatchImportJob(jobId);
     return true;
@@ -126,9 +199,6 @@ function notifyTerminal(payload: ImportEventPayload | ImportJobRow, eventHint?: 
   return false;
 }
 
-/**
- * Parse SSE text chunks into { event, data } messages.
- */
 function parseSseChunk(
   buffer: string,
   onEvent: (event: string, data: string) => void,
@@ -148,8 +218,8 @@ function parseSseChunk(
   return rest;
 }
 
-async function fetchRecentJobs(): Promise<ImportJobRow[]> {
-  const res = await apiClient.get<{ success: boolean; data: ImportJobRow[] }>(
+async function fetchRecentJobs(): Promise<JobRow[]> {
+  const res = await apiClient.get<{ success: boolean; data: JobRow[] }>(
     '/admin/toolkit/import/jobs',
     { params: { limit: 30 } },
   );
@@ -157,9 +227,9 @@ async function fetchRecentJobs(): Promise<ImportJobRow[]> {
   return res.data.data ?? [];
 }
 
-async function fetchJob(jobId: string): Promise<ImportJobRow | null> {
+async function fetchJob(jobId: string): Promise<JobRow | null> {
   try {
-    const res = await apiClient.get<{ success: boolean; data: ImportJobRow }>(
+    const res = await apiClient.get<{ success: boolean; data: JobRow }>(
       `/admin/toolkit/import/jobs/${jobId}`,
     );
     if (!res.data?.success) return null;
@@ -169,9 +239,6 @@ async function fetchJob(jobId: string): Promise<ImportJobRow | null> {
   }
 }
 
-/**
- * Global hook: one SSE stream + PG recovery + watched-job status checks.
- */
 export function useImportJobNotifications() {
   const token = useAuthStore((s) => s.token);
   const qc = useQueryClient();
@@ -190,11 +257,12 @@ export function useImportJobNotifications() {
     let cancelled = false;
     let attempt = 0;
 
-    const onTerminal = (payload: ImportEventPayload | ImportJobRow, eventName?: string) => {
-      const shown = notifyTerminal(payload, eventName);
+    const onTerminal = (payload: JobEventPayload | JobRow, eventName?: string) => {
+      const shown = pushBell(payload, eventName);
       if (
-        shown &&
-        (payload.status === 'completed' || eventName === 'IMPORT_COMPLETED')
+        shown
+        && (payload.job_type === 'import' || !payload.job_type)
+        && isSuccessEvent(eventName, payload.status)
       ) {
         qc.invalidateQueries({ queryKey: ['pim-products'] });
       }
@@ -202,10 +270,10 @@ export function useImportJobNotifications() {
 
     const handlePayload = (eventName: string, raw: string) => {
       try {
-        const payload = JSON.parse(raw) as ImportEventPayload;
+        const payload = JSON.parse(raw) as JobEventPayload;
         onTerminal(payload, eventName);
       } catch {
-        /* ignore malformed */
+        /* ignore */
       }
     };
 
@@ -216,15 +284,13 @@ export function useImportJobNotifications() {
         const watched = loadIdSet(WATCH_KEY);
         for (const job of jobs) {
           const id = String(job.job_id || job.id || '');
-          if (job.status === 'completed' || job.status === 'failed') {
-            const doneAt = job.completed_at ? Date.parse(job.completed_at) : 0;
-            // Always surface watched jobs; otherwise only recent terminals
-            if (!watched.has(id) && doneAt && doneAt < cutoff) continue;
-            onTerminal(job);
-          }
+          if (job.status !== 'completed' && job.status !== 'failed') continue;
+          const doneAt = job.completed_at ? Date.parse(job.completed_at) : 0;
+          if (!watched.has(id) && doneAt && doneAt < cutoff) continue;
+          onTerminal(job);
         }
       } catch {
-        /* offline / auth — ignore */
+        /* ignore */
       }
     };
 
@@ -264,9 +330,7 @@ export function useImportJobNotifications() {
           },
           signal: ac.signal,
         });
-        if (!res.ok || !res.body) {
-          throw new Error(`SSE HTTP ${res.status}`);
-        }
+        if (!res.ok || !res.body) throw new Error(`SSE HTTP ${res.status}`);
         attempt = 0;
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
